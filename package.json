@@ -3,7 +3,7 @@
   "version": "1.0.0",
     "displayName": "[NoisyBird] UI Extension",
   "description": "This is a UGUI Extension.",
-  "unity": "6000.2",
+  "unity": "6000.0",
   "keywords": [
     "NoisyBird",
     "UGUI",
