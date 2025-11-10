@@ -194,8 +194,23 @@ public static class PresetExtension
         { text = "프리셋 저장" };
         save.style.height = 20;
 
+        string menuName = "없음";
+        var firstObj = editor.targets?.FirstOrDefault();
+        if (firstObj != null)
+        {
+            var presets = EnumerateCompatiblePresets(firstObj).ToList();
+            if (presets.Count > 0)
+            {
+                menuName = presets[0].displayName;
+            }
+        }
+        var setDefault = new Button(() => ShowSetDefaultMenu(editor.targets))
+            { text = $"[Default] {menuName} ▼" };
+        setDefault.style.height = 20;
+
         bar.Add(quick);
         bar.Add(settings);
+        bar.Add(setDefault);
         bar.Add(save);
         return bar;
     }
@@ -391,6 +406,84 @@ public static class PresetExtension
     {
         if (!preset) return;
         EditorUtility.OpenPropertyEditor(preset);
+    }
+    
+    private static void ShowSetDefaultMenu(UnityEngine.Object[] targets)
+    {
+        var menu = new GenericMenu();
+        var sample = targets?.FirstOrDefault();
+
+        if (!sample)
+        {
+            menu.AddDisabledItem(new GUIContent("대상이 없음"));
+            menu.ShowAsContext();
+            return;
+        }
+
+        // 호환 프리셋 목록
+        var presets = EnumerateCompatiblePresets(sample).ToList();
+        if (presets.Count == 0)
+        {
+            menu.AddDisabledItem(new GUIContent("프리셋 없음"));
+        }
+        else
+        {
+            foreach (var (preset, displayName) in presets)
+            {
+                var list = Preset.GetDefaultPresetsForType(preset.GetPresetType()).ToList();
+                var existing = list.Exists(dp => dp.preset == preset);
+                menu.AddItem(new GUIContent($"{displayName}"), existing, () => SetAsDefaultPreset(preset));
+            }
+        }
+
+        menu.ShowAsContext();
+    }
+
+    private static void SetAsDefaultPreset(Preset preset)
+    {
+        if (!preset) return;
+
+        // 이 Preset이 기본 프리셋 시스템 대상인지 확인
+        var pType = preset.GetPresetType(); // PresetType
+        if (!pType.IsValidDefault())
+        {
+            EditorUtility.DisplayDialog("기본 프리셋 지정",
+                $"이 타입은 기본 프리셋 대상이 아닙니다.\n({pType.GetManagedTypeName()})",
+                "확인");
+            return;
+        }
+
+        // 기존 기본 프리셋 목록을 가져와 맨 위에 삽입(우선순위 높음)
+        var list = Preset.GetDefaultPresetsForType(pType).ToList(); // List<DefaultPreset>
+        // 이미 동일 preset이 있으면 최상단으로 끌어올림
+        var existingIdx = list.FindIndex(dp => dp.preset == preset);
+        if (existingIdx >= 0)
+        {
+            var dp = list[existingIdx];
+            list.RemoveAt(existingIdx);
+            list.Insert(0, dp);
+        }
+        else
+        {
+            var dp = new DefaultPreset
+            {
+                preset = preset,
+                filter = string.Empty, // 필터 없이 전체 적용
+                enabled = true
+            };
+            list.Insert(0, dp);
+        }
+
+        // 적용
+        Preset.SetDefaultPresetsForType(pType, list.ToArray());
+
+        // UX: 저장/리프레시 & 관리자 창 안내
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+
+        Debug.Log($"[PresetExtension] 기본 프리셋 지정: {preset.name} → {pType.GetManagedTypeName()}");
+        // 선택 사항: 바로 열어 확인할 수 있게
+        //SettingsService.OpenProjectSettings("Project/Preset Manager");
     }
 }
 #endif
