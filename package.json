@@ -10,6 +10,10 @@
     "UI",
     "Extension"
   ],
+  "author": {
+    "name" : "NoisyBird",
+    "email" : "noisybird.dev@gmail.com",
+  },
   "dependencies": {
   }
 }
